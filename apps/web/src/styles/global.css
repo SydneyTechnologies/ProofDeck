@@ -207,12 +207,7 @@ select {
   aspect-ratio: 16 / 9;
   border-bottom: 1px solid var(--line);
   background: #fff;
-}
-
-.deck-cover-block {
-  position: absolute;
-  border-radius: 4px;
-  border: 1px solid rgba(60, 64, 67, 0.2);
+  overflow: hidden;
 }
 
 .deck-meta {
@@ -406,15 +401,57 @@ select {
 .slide-thumb-canvas {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: 4px;
+  border-radius: 2px;
   background: #fff;
   overflow: hidden;
 }
 
-.slide-thumb-block {
+.slide-snapshot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+.slide-snapshot-surface {
   position: absolute;
-  border-radius: 2px;
-  border: 1px solid rgba(60, 64, 67, 0.18);
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  background: #fff;
+}
+
+.slide-snapshot,
+.slide-snapshot * {
+  pointer-events: none;
+}
+
+.slide-snapshot-block {
+  position: absolute;
+  border: 1px solid #d2d6da;
+  background: #fff;
+  overflow: hidden;
+}
+
+.slide-snapshot-content {
+  height: 100%;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.slide-snapshot-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.slide-snapshot-math .katex-display {
+  margin: 0;
+}
+
+.slide-snapshot-graph,
+.slide-snapshot-graph .graph-preview {
+  height: 100%;
 }
 
 .gslides-stage-column {

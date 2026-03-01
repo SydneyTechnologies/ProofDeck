@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Deck } from "@proofdeck/core";
-import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./SlideCanvas";
+import { SlideSnapshot } from "./SlideSnapshot";
 
 interface DeckHomeProps {
   decks: Deck[];
@@ -8,16 +8,6 @@ interface DeckHomeProps {
   onOpenDeck: (deckId: string) => void;
   onCreateDeck: (title?: string) => string;
   onDeleteDeck: (deckId: string) => void;
-}
-
-function getBlockTone(type: "text" | "math" | "graph"): string {
-  if (type === "text") {
-    return "var(--tone-text)";
-  }
-  if (type === "math") {
-    return "var(--tone-math)";
-  }
-  return "var(--tone-graph)";
 }
 
 function formatDate(isoDate: string): string {
@@ -88,19 +78,7 @@ export function DeckHome({ decks, activeDeckId, onOpenDeck, onCreateDeck, onDele
                   <article className={`deck-card ${deck.id === activeDeckId ? "active" : ""}`}>
                     <button className="deck-cover" onClick={() => onOpenDeck(deck.id)}>
                       <div className="deck-cover-canvas">
-                        {coverSlide?.blocks.map((block) => (
-                          <span
-                            key={block.id}
-                            className="deck-cover-block"
-                            style={{
-                              left: `${(block.layout.x / CANVAS_WIDTH) * 100}%`,
-                              top: `${(block.layout.y / CANVAS_HEIGHT) * 100}%`,
-                              width: `${(block.layout.width / CANVAS_WIDTH) * 100}%`,
-                              height: `${(block.layout.height / CANVAS_HEIGHT) * 100}%`,
-                              backgroundColor: getBlockTone(block.type)
-                            }}
-                          />
-                        ))}
+                        <SlideSnapshot slide={coverSlide} />
                       </div>
                     </button>
 

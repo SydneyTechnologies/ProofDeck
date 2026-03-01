@@ -1,0 +1,376 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  --bg-main: #f5f9ef;
+  --bg-alt: #edf4f8;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-border: rgba(13, 80, 63, 0.12);
+  --ink: #1f2a32;
+  --muted: #5d6b74;
+  --accent: #0f766e;
+  --accent-strong: #095f57;
+  --accent-contrast: #f4fbf9;
+  --warn: #ad4f1c;
+  --error: #b73a3a;
+  --ok: #1b7a43;
+  --shadow: 0 14px 36px rgba(15, 57, 71, 0.12);
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 20% 0%, #daf6ee 0%, rgba(218, 246, 238, 0) 42%),
+    radial-gradient(circle at 85% 5%, #ffe6cf 0%, rgba(255, 230, 207, 0) 38%),
+    linear-gradient(170deg, var(--bg-main) 0%, var(--bg-alt) 100%);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 3.6vw, 2.8rem);
+  letter-spacing: -0.03em;
+}
+
+h2 {
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.8rem;
+}
+
+.app-shell {
+  width: min(1320px, 94vw);
+  margin: 1.6rem auto 3rem;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+
+.eyebrow {
+  color: var(--accent-strong);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.42rem;
+}
+
+.hero-sub {
+  color: var(--muted);
+  margin-top: 0.3rem;
+}
+
+.deck-title-wrap {
+  min-width: 280px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1rem;
+}
+
+.editor-preview {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.95fr);
+  gap: 1rem;
+}
+
+.insights {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  backdrop-filter: blur(7px);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.button {
+  font-family: inherit;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: #fdfefe;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.2s ease;
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.5);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button-accent {
+  background: linear-gradient(135deg, var(--accent) 0%, #11a59b 100%);
+  color: var(--accent-contrast);
+  border: 0;
+}
+
+.button-ghost {
+  background: transparent;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.field-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.55rem 0 0.35rem;
+}
+
+.input,
+.textarea,
+select {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 255, 255, 0.88);
+  font: inherit;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.deck-title-input {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.slide-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.slide-chip {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+}
+
+.slide-chip.active {
+  border-color: rgba(15, 118, 110, 0.55);
+  background: rgba(218, 245, 239, 0.76);
+}
+
+.slide-index {
+  color: var(--accent-strong);
+  width: 1.5rem;
+}
+
+.blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.block-card {
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  padding: 0.75rem;
+}
+
+.block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.block-type {
+  color: var(--accent-strong);
+}
+
+.preview-panel {
+  animation: reveal 260ms ease;
+}
+
+.preview-text,
+.math-block,
+.graph-block {
+  margin-bottom: 0.8rem;
+}
+
+.graph-title {
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+}
+
+.graph-preview svg {
+  width: 100%;
+  height: auto;
+}
+
+.graph-bg {
+  fill: #f2faf8;
+}
+
+.graph-axis {
+  stroke: rgba(24, 64, 80, 0.35);
+  stroke-width: 1.2;
+}
+
+.graph-line {
+  fill: none;
+  stroke: #0f766e;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.graph-dot {
+  fill: #0f766e;
+}
+
+.graph-bar {
+  fill: rgba(255, 127, 54, 0.72);
+}
+
+.issue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.issue {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.issue-warning {
+  border-color: rgba(173, 79, 28, 0.35);
+}
+
+.issue-error {
+  border-color: rgba(183, 58, 58, 0.35);
+}
+
+.issue-info {
+  border-color: rgba(15, 118, 110, 0.35);
+}
+
+.status-good {
+  color: var(--ok);
+}
+
+.status-error {
+  color: var(--error);
+  margin-top: 0.45rem;
+}
+
+.graph-meta {
+  padding: 0.4rem 0;
+}
+
+.key-manager {
+  margin-top: 0.65rem;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1140px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .insights {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deck-title-wrap {
+    width: 100%;
+  }
+}

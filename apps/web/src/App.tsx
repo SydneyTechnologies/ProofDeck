@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { createProvider, type AIProvider, type ReviewResult } from "@proofdeck/ai";
-import { createId, lintDeckNotation, type GraphSpec } from "@proofdeck/core";
+import { createId, lintDeckNotation, type BlockLayout, type GraphSpec } from "@proofdeck/core";
 import { AIReviewPanel } from "./components/AIReviewPanel";
+import { InspectorPanel } from "./components/InspectorPanel";
 import { LintPanel } from "./components/LintPanel";
 import { ProviderSettings } from "./components/ProviderSettings";
-import { SlideEditor } from "./components/SlideEditor";
-import { SlideList } from "./components/SlideList";
-import { SlidePreview } from "./components/SlidePreview";
+import { SlideCanvas } from "./components/SlideCanvas";
+import { SlideRail } from "./components/SlideRail";
 import { useDeckStore } from "./hooks/useDeckStore";
 import { decryptSecret, encryptSecret } from "./lib/secureStore";
 import { DEFAULT_PROVIDER_SETTINGS, type ProviderSettings as ProviderSettingsType } from "./types/provider";
@@ -30,6 +30,23 @@ function loadProviderSettings(): ProviderSettingsType {
   }
 }
 
+function clampLayout(layout: Partial<BlockLayout>): Partial<BlockLayout> {
+  const next = { ...layout };
+  if (typeof next.width === "number") {
+    next.width = Math.max(80, Math.round(next.width));
+  }
+  if (typeof next.height === "number") {
+    next.height = Math.max(60, Math.round(next.height));
+  }
+  if (typeof next.x === "number") {
+    next.x = Math.max(0, Math.round(next.x));
+  }
+  if (typeof next.y === "number") {
+    next.y = Math.max(0, Math.round(next.y));
+  }
+  return next;
+}
+
 export function App() {
   const deck = useDeckStore((state) => state.deck);
   const selectedSlideId = useDeckStore((state) => state.selectedSlideId);
@@ -38,11 +55,14 @@ export function App() {
   const addSlide = useDeckStore((state) => state.addSlide);
   const updateSlideTitle = useDeckStore((state) => state.updateSlideTitle);
   const addBlock = useDeckStore((state) => state.addBlock);
+  const updateBlockLayout = useDeckStore((state) => state.updateBlockLayout);
   const updateTextBlock = useDeckStore((state) => state.updateTextBlock);
   const updateMathBlock = useDeckStore((state) => state.updateMathBlock);
+  const updateGraphSpec = useDeckStore((state) => state.updateGraphSpec);
   const addGraphBlockFromSpec = useDeckStore((state) => state.addGraphBlockFromSpec);
   const removeBlock = useDeckStore((state) => state.removeBlock);
 
+  const [selectedBlockId, setSelectedBlockId] = useState("");
   const [providerSettings, setProviderSettings] = useState<ProviderSettingsType>(loadProviderSettings);
   const [apiKey, setApiKey] = useState("");
   const [hasStoredKey, setHasStoredKey] = useState(Boolean(localStorage.getItem(PROVIDER_SECRET_KEY)));
@@ -63,6 +83,21 @@ export function App() {
       selectSlide(deck.slides[0].id);
     }
   }, [deck.slides, selectSlide, selectedSlideId]);
+
+  useEffect(() => {
+    if (!selectedSlide?.blocks.length) {
+      setSelectedBlockId("");
+      return;
+    }
+
+    const blockExists = selectedSlide.blocks.some((block) => block.id === selectedBlockId);
+    if (!blockExists) {
+      const firstBlock = selectedSlide.blocks[0];
+      if (firstBlock) {
+        setSelectedBlockId(firstBlock.id);
+      }
+    }
+  }, [selectedBlockId, selectedSlide]);
 
   const provider: AIProvider | null = useMemo(() => {
     if (providerSettings.mode === "mock") {
@@ -160,44 +195,76 @@ export function App() {
   const hasProviderReady = Boolean(provider);
 
   return (
-    <div className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Open Source • BYOK • AI Optional</p>
-          <h1>ProofDeck</h1>
-          <p className="hero-sub">Symbolic-aware slides with a pluggable intelligence layer.</p>
+    <div className="studio-shell">
+      <header className="studio-topbar">
+        <div className="brand-lockup">
+          <p className="kicker">ProofDeck</p>
+          <h1>Technical Slide Studio</h1>
         </div>
-        <div className="deck-title-wrap">
+
+        <div className="topbar-field">
           <label className="field-label" htmlFor="deckTitleInput">
             Deck Title
           </label>
           <input
             id="deckTitleInput"
-            className="input deck-title-input"
+            className="input"
             value={deck.title}
             onChange={(event) => setDeckTitle(event.target.value)}
           />
         </div>
       </header>
 
-      <main className="layout">
-        <SlideList slides={deck.slides} selectedSlideId={selectedSlideId} onSelect={selectSlide} onAddSlide={addSlide} />
+      <main className="studio-grid">
+        <SlideRail
+          slides={deck.slides}
+          selectedSlideId={selectedSlideId}
+          onSelectSlide={selectSlide}
+          onAddSlide={addSlide}
+        />
 
-        <section className="editor-preview">
-          <SlideEditor
+        <section className="workspace-panel">
+          <div className="workspace-header">
+            <h2>{selectedSlide?.title ?? "No slide selected"}</h2>
+            <p className="muted">Drag blocks directly on the slide canvas.</p>
+          </div>
+
+          <SlideCanvas
             slide={selectedSlide}
-            onSlideTitleChange={(title) => selectedSlide && updateSlideTitle(selectedSlide.id, title)}
-            onAddTextBlock={() => selectedSlide && addBlock(selectedSlide.id, "text")}
-            onAddMathBlock={() => selectedSlide && addBlock(selectedSlide.id, "math")}
-            onAddGraphBlock={() => selectedSlide && addBlock(selectedSlide.id, "graph")}
-            onTextChange={(blockId, value) => selectedSlide && updateTextBlock(selectedSlide.id, blockId, value)}
-            onMathChange={(blockId, value) => selectedSlide && updateMathBlock(selectedSlide.id, blockId, value)}
-            onRemoveBlock={(blockId) => selectedSlide && removeBlock(selectedSlide.id, blockId)}
+            selectedBlockId={selectedBlockId}
+            onSelectBlock={setSelectedBlockId}
+            onMoveBlock={(blockId, layout) => {
+              if (!selectedSlide) {
+                return;
+              }
+              updateBlockLayout(selectedSlide.id, blockId, clampLayout(layout));
+            }}
           />
-          <SlidePreview slide={selectedSlide} />
         </section>
 
-        <section className="insights">
+        <div className="inspector-column">
+          <InspectorPanel
+            slide={selectedSlide}
+            selectedBlockId={selectedBlockId}
+            onSelectBlock={setSelectedBlockId}
+            onSlideTitleChange={(title) => selectedSlide && updateSlideTitle(selectedSlide.id, title)}
+            onAddText={() => selectedSlide && addBlock(selectedSlide.id, "text")}
+            onAddMath={() => selectedSlide && addBlock(selectedSlide.id, "math")}
+            onAddGraph={() => selectedSlide && addBlock(selectedSlide.id, "graph")}
+            onUpdateText={(blockId, value) => selectedSlide && updateTextBlock(selectedSlide.id, blockId, value)}
+            onUpdateMath={(blockId, value) => selectedSlide && updateMathBlock(selectedSlide.id, blockId, value)}
+            onUpdateGraphSpec={(blockId, spec) => selectedSlide && updateGraphSpec(selectedSlide.id, blockId, spec)}
+            onUpdateLayout={(blockId, layout) =>
+              selectedSlide && updateBlockLayout(selectedSlide.id, blockId, clampLayout(layout))
+            }
+            onRemoveBlock={(blockId) => {
+              if (!selectedSlide) {
+                return;
+              }
+              removeBlock(selectedSlide.id, blockId);
+            }}
+          />
+
           <LintPanel deck={deck} report={lintReport} />
           <ProviderSettings
             settings={providerSettings}
@@ -217,7 +284,7 @@ export function App() {
             busy={busy}
             error={aiError}
           />
-        </section>
+        </div>
       </main>
     </div>
   );

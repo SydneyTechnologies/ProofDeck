@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  type BlockLayout,
   createEmptyDeck,
   createId,
   type Deck,
@@ -19,8 +20,10 @@ interface DeckState {
   addSlide: () => void;
   updateSlideTitle: (slideId: string, title: string) => void;
   addBlock: (slideId: string, type: SlideBlock["type"]) => void;
+  updateBlockLayout: (slideId: string, blockId: string, layout: Partial<BlockLayout>) => void;
   updateTextBlock: (slideId: string, blockId: string, text: string) => void;
   updateMathBlock: (slideId: string, blockId: string, latex: string) => void;
+  updateGraphSpec: (slideId: string, blockId: string, spec: GraphSpec) => void;
   addGraphBlockFromSpec: (slideId: string, spec: GraphSpec) => void;
   removeBlock: (slideId: string, blockId: string) => void;
 }
@@ -61,7 +64,13 @@ function defaultBlock(type: SlideBlock["type"]): SlideBlock {
     return {
       id: createId("text"),
       type: "text",
-      text: "New text block"
+      text: "New text block",
+      layout: {
+        x: 72,
+        y: 64,
+        width: 440,
+        height: 150
+      }
     };
   }
 
@@ -70,7 +79,13 @@ function defaultBlock(type: SlideBlock["type"]): SlideBlock {
       id: createId("math"),
       type: "math",
       latex: "a = b + c",
-      displayMode: true
+      displayMode: true,
+      layout: {
+        x: 96,
+        y: 248,
+        width: 380,
+        height: 180
+      }
     };
   }
 
@@ -83,6 +98,12 @@ function defaultBlock(type: SlideBlock["type"]): SlideBlock {
       title: "Sample Graph",
       x: [-2, -1, 0, 1, 2],
       y: [4, 1, 0, 1, 4]
+    },
+    layout: {
+      x: 520,
+      y: 110,
+      width: 520,
+      height: 300
     }
   };
 }
@@ -143,6 +164,27 @@ export const useDeckStore = create<DeckState>((set) => ({
       persistDeck(next);
       return { deck: next };
     }),
+  updateBlockLayout: (slideId, blockId, layout) =>
+    set((state) => {
+      const next = withUpdatedTimestamp(
+        updateSlide(state.deck, slideId, (slide) => ({
+          ...slide,
+          blocks: slide.blocks.map((block) =>
+            block.id === blockId
+              ? {
+                  ...block,
+                  layout: {
+                    ...block.layout,
+                    ...layout
+                  }
+                }
+              : block
+          )
+        }))
+      );
+      persistDeck(next);
+      return { deck: next };
+    }),
   updateTextBlock: (slideId, blockId, text) =>
     set((state) => {
       const next = withUpdatedTimestamp(
@@ -179,6 +221,24 @@ export const useDeckStore = create<DeckState>((set) => ({
       persistDeck(next);
       return { deck: next };
     }),
+  updateGraphSpec: (slideId, blockId, spec) =>
+    set((state) => {
+      const next = withUpdatedTimestamp(
+        updateSlide(state.deck, slideId, (slide) => ({
+          ...slide,
+          blocks: slide.blocks.map((block) =>
+            block.id === blockId && block.type === "graph"
+              ? {
+                  ...block,
+                  spec
+                }
+              : block
+          )
+        }))
+      );
+      persistDeck(next);
+      return { deck: next };
+    }),
   addGraphBlockFromSpec: (slideId, spec) =>
     set((state) => {
       const graphBlock: SlideBlock = {
@@ -187,6 +247,12 @@ export const useDeckStore = create<DeckState>((set) => ({
         spec: {
           ...spec,
           id: spec.id || createId("spec")
+        },
+        layout: {
+          x: 520,
+          y: 110,
+          width: 520,
+          height: 300
         }
       };
 

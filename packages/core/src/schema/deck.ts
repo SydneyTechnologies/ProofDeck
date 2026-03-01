@@ -2,6 +2,13 @@ import { z } from "zod";
 
 export const graphTypeSchema = z.enum(["line", "scatter", "bar"]);
 
+export const blockLayoutSchema = z.object({
+  x: z.number().min(0).default(64),
+  y: z.number().min(0).default(64),
+  width: z.number().min(80).default(360),
+  height: z.number().min(60).default(160)
+});
+
 export const graphSpecSchema = z.object({
   id: z.string(),
   type: graphTypeSchema,
@@ -13,20 +20,38 @@ export const graphSpecSchema = z.object({
 export const textBlockSchema = z.object({
   id: z.string(),
   type: z.literal("text"),
-  text: z.string()
+  text: z.string(),
+  layout: blockLayoutSchema.default({
+    x: 72,
+    y: 64,
+    width: 440,
+    height: 150
+  })
 });
 
 export const mathBlockSchema = z.object({
   id: z.string(),
   type: z.literal("math"),
   latex: z.string(),
-  displayMode: z.boolean().default(true)
+  displayMode: z.boolean().default(true),
+  layout: blockLayoutSchema.default({
+    x: 96,
+    y: 240,
+    width: 380,
+    height: 180
+  })
 });
 
 export const graphBlockSchema = z.object({
   id: z.string(),
   type: z.literal("graph"),
-  spec: graphSpecSchema
+  spec: graphSpecSchema,
+  layout: blockLayoutSchema.default({
+    x: 520,
+    y: 110,
+    width: 520,
+    height: 300
+  })
 });
 
 export const slideBlockSchema = z.discriminatedUnion("type", [
@@ -67,6 +92,7 @@ export const deckSchema = z.object({
 });
 
 export type GraphType = z.infer<typeof graphTypeSchema>;
+export type BlockLayout = z.infer<typeof blockLayoutSchema>;
 export type GraphSpec = z.infer<typeof graphSpecSchema>;
 export type SlideBlock = z.infer<typeof slideBlockSchema>;
 export type Slide = z.infer<typeof slideSchema>;
@@ -97,13 +123,25 @@ export function createEmptyDeck(title = "Untitled Deck"): Deck {
           {
             id: createId("text"),
             type: "text",
-            text: "Start writing your technical narrative here."
+            text: "Start writing your technical narrative here.",
+            layout: {
+              x: 72,
+              y: 64,
+              width: 440,
+              height: 150
+            }
           },
           {
             id: createId("math"),
             type: "math",
             latex: "x = y + z",
-            displayMode: true
+            displayMode: true,
+            layout: {
+              x: 96,
+              y: 248,
+              width: 380,
+              height: 180
+            }
           }
         ]
       }

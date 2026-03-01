@@ -1,6 +1,6 @@
 import { DndContext, PointerSensor, useDraggable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { BlockMath } from "react-katex";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { BlockLayout, Slide } from "@proofdeck/core";
 import { GraphPreview } from "./GraphPreview";
 
@@ -17,6 +17,7 @@ interface SlideCanvasProps {
 interface DraggableBlockProps {
   block: Slide["blocks"][number];
   selected: boolean;
+  scale: number;
   onSelectBlock: (blockId: string) => void;
 }
 
@@ -24,7 +25,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function DraggableBlock({ block, selected, onSelectBlock }: DraggableBlockProps) {
+function DraggableBlock({ block, selected, scale, onSelectBlock }: DraggableBlockProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: block.id
   });
@@ -34,7 +35,7 @@ function DraggableBlock({ block, selected, onSelectBlock }: DraggableBlockProps)
     top: block.layout.y,
     width: block.layout.width,
     height: block.layout.height,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: transform ? `translate3d(${transform.x / scale}px, ${transform.y / scale}px, 0)` : undefined,
     zIndex: isDragging ? 24 : selected ? 12 : 4
   };
 
@@ -61,6 +62,9 @@ function DraggableBlock({ block, selected, onSelectBlock }: DraggableBlockProps)
 }
 
 export function SlideCanvas({ slide, selectedBlockId, onSelectBlock, onMoveBlock }: SlideCanvasProps) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(CANVAS_WIDTH);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -68,6 +72,27 @@ export function SlideCanvas({ slide, selectedBlockId, onSelectBlock, onMoveBlock
       }
     })
   );
+
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) {
+      return;
+    }
+
+    const update = () => {
+      setViewportWidth(element.clientWidth);
+    };
+    update();
+
+    const observer = new ResizeObserver(() => {
+      update();
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   if (!slide) {
     return (
@@ -77,6 +102,8 @@ export function SlideCanvas({ slide, selectedBlockId, onSelectBlock, onMoveBlock
     );
   }
   const currentSlide = slide;
+  const scale = Math.min(1, Math.max(0.2, viewportWidth / CANVAS_WIDTH));
+  const scaledHeight = Math.round(CANVAS_HEIGHT * scale);
 
   function handleDragEnd(event: DragEndEvent): void {
     const blockId = String(event.active.id);
@@ -85,8 +112,8 @@ export function SlideCanvas({ slide, selectedBlockId, onSelectBlock, onMoveBlock
       return;
     }
 
-    const nextX = clamp(block.layout.x + event.delta.x, 0, CANVAS_WIDTH - block.layout.width);
-    const nextY = clamp(block.layout.y + event.delta.y, 0, CANVAS_HEIGHT - block.layout.height);
+    const nextX = clamp(block.layout.x + event.delta.x / scale, 0, CANVAS_WIDTH - block.layout.width);
+    const nextY = clamp(block.layout.y + event.delta.y / scale, 0, CANVAS_HEIGHT - block.layout.height);
 
     onMoveBlock(block.id, {
       x: Math.round(nextX),
@@ -98,15 +125,18 @@ export function SlideCanvas({ slide, selectedBlockId, onSelectBlock, onMoveBlock
     <section className="canvas-stage">
       <div className="canvas-surface-wrap">
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className="canvas-surface" role="presentation">
-            {currentSlide.blocks.map((block) => (
-              <DraggableBlock
-                key={block.id}
-                block={block}
-                selected={selectedBlockId === block.id}
-                onSelectBlock={onSelectBlock}
-              />
-            ))}
+          <div className="canvas-viewport" ref={viewportRef} style={{ height: `${scaledHeight}px` }}>
+            <div className="canvas-surface" role="presentation" style={{ transform: `scale(${scale})` }}>
+              {currentSlide.blocks.map((block) => (
+                <DraggableBlock
+                  key={block.id}
+                  block={block}
+                  selected={selectedBlockId === block.id}
+                  scale={scale}
+                  onSelectBlock={onSelectBlock}
+                />
+              ))}
+            </div>
           </div>
         </DndContext>
       </div>

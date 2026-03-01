@@ -10,11 +10,18 @@ import {
   validateDeck
 } from "@proofdeck/core";
 
-const DECK_STORAGE_KEY = "proofdeck.deck.v1";
+const DECK_LIBRARY_STORAGE_KEY = "proofdeck.decks.v1";
+const ACTIVE_DECK_ID_STORAGE_KEY = "proofdeck.activeDeckId.v1";
+const LEGACY_DECK_STORAGE_KEY = "proofdeck.deck.v1";
 
 interface DeckState {
+  decks: Deck[];
   deck: Deck;
+  activeDeckId: string;
   selectedSlideId: string;
+  openDeck: (deckId: string) => void;
+  createDeck: (title?: string) => string;
+  deleteDeck: (deckId: string) => void;
   setDeckTitle: (title: string) => void;
   selectSlide: (slideId: string) => void;
   addSlide: () => void;
@@ -26,37 +33,6 @@ interface DeckState {
   updateGraphSpec: (slideId: string, blockId: string, spec: GraphSpec) => void;
   addGraphBlockFromSpec: (slideId: string, spec: GraphSpec) => void;
   removeBlock: (slideId: string, blockId: string) => void;
-}
-
-function loadInitialDeck(): Deck {
-  const persisted = localStorage.getItem(DECK_STORAGE_KEY);
-  if (!persisted) {
-    return createEmptyDeck("ProofDeck Demo");
-  }
-
-  try {
-    return validateDeck(JSON.parse(persisted));
-  } catch {
-    return createEmptyDeck("ProofDeck Demo");
-  }
-}
-
-function persistDeck(deck: Deck): void {
-  localStorage.setItem(DECK_STORAGE_KEY, JSON.stringify(deck));
-}
-
-function withUpdatedTimestamp(deck: Deck): Deck {
-  return {
-    ...deck,
-    updatedAt: new Date().toISOString()
-  };
-}
-
-function updateSlide(deck: Deck, slideId: string, updater: (slide: Slide) => Slide): Deck {
-  return {
-    ...deck,
-    slides: deck.slides.map((slide) => (slide.id === slideId ? updater(slide) : slide))
-  };
 }
 
 function defaultBlock(type: SlideBlock["type"]): SlideBlock {
@@ -108,172 +84,341 @@ function defaultBlock(type: SlideBlock["type"]): SlideBlock {
   };
 }
 
-const initialDeck = loadInitialDeck();
+function persistLibrary(decks: Deck[], activeDeckId: string): void {
+  localStorage.setItem(DECK_LIBRARY_STORAGE_KEY, JSON.stringify(decks));
+  localStorage.setItem(ACTIVE_DECK_ID_STORAGE_KEY, activeDeckId);
+}
 
-export const useDeckStore = create<DeckState>((set) => ({
-  deck: initialDeck,
-  selectedSlideId: initialDeck.slides[0]?.id ?? "",
-  setDeckTitle: (title) =>
-    set((state) => {
-      const next = withUpdatedTimestamp({
-        ...state.deck,
-        title
+function loadLegacyDeck(): Deck | null {
+  const legacy = localStorage.getItem(LEGACY_DECK_STORAGE_KEY);
+  if (!legacy) {
+    return null;
+  }
+
+  try {
+    return validateDeck(JSON.parse(legacy));
+  } catch {
+    return null;
+  }
+}
+
+function loadInitialState(): { decks: Deck[]; activeDeckId: string; selectedSlideId: string; deck: Deck } {
+  const persistedDecks = localStorage.getItem(DECK_LIBRARY_STORAGE_KEY);
+  let decks: Deck[] = [];
+
+  if (persistedDecks) {
+    try {
+      const parsed = JSON.parse(persistedDecks) as unknown[];
+      decks = parsed.map((item) => validateDeck(item));
+    } catch {
+      decks = [];
+    }
+  }
+
+  if (decks.length === 0) {
+    const legacyDeck = loadLegacyDeck();
+    if (legacyDeck) {
+      decks = [legacyDeck];
+      localStorage.removeItem(LEGACY_DECK_STORAGE_KEY);
+    }
+  }
+
+  if (decks.length === 0) {
+    decks = [createEmptyDeck("ProofDeck Demo")];
+  }
+
+  const storedActiveDeckId = localStorage.getItem(ACTIVE_DECK_ID_STORAGE_KEY);
+  const activeDeck = decks.find((item) => item.id === storedActiveDeckId) ?? decks[0];
+
+  if (!activeDeck) {
+    const fallbackDeck = createEmptyDeck("ProofDeck Demo");
+    decks = [fallbackDeck];
+    persistLibrary(decks, fallbackDeck.id);
+    return {
+      decks,
+      activeDeckId: fallbackDeck.id,
+      selectedSlideId: fallbackDeck.slides[0]?.id ?? "",
+      deck: fallbackDeck
+    };
+  }
+
+  persistLibrary(decks, activeDeck.id);
+  return {
+    decks,
+    activeDeckId: activeDeck.id,
+    selectedSlideId: activeDeck.slides[0]?.id ?? "",
+    deck: activeDeck
+  };
+}
+
+function withUpdatedTimestamp(deck: Deck): Deck {
+  return {
+    ...deck,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function updateSlide(deck: Deck, slideId: string, updater: (slide: Slide) => Slide): Deck {
+  return {
+    ...deck,
+    slides: deck.slides.map((slide) => (slide.id === slideId ? updater(slide) : slide))
+  };
+}
+
+function replaceDeckInLibrary(decks: Deck[], nextDeck: Deck): Deck[] {
+  return decks.map((item) => (item.id === nextDeck.id ? nextDeck : item));
+}
+
+function createReplacementDeckTitle(decks: Deck[]): string {
+  return `Untitled Deck ${decks.length + 1}`;
+}
+
+const initialState = loadInitialState();
+
+export const useDeckStore = create<DeckState>((set, get) => ({
+  decks: initialState.decks,
+  deck: initialState.deck,
+  activeDeckId: initialState.activeDeckId,
+  selectedSlideId: initialState.selectedSlideId,
+  openDeck: (deckId) => {
+    const state = get();
+    const nextDeck = state.decks.find((item) => item.id === deckId);
+    if (!nextDeck) {
+      return;
+    }
+
+    persistLibrary(state.decks, nextDeck.id);
+    set({
+      activeDeckId: nextDeck.id,
+      deck: nextDeck,
+      selectedSlideId: nextDeck.slides[0]?.id ?? ""
+    });
+  },
+  createDeck: (title) => {
+    const state = get();
+    const nextDeck = createEmptyDeck(title?.trim() || createReplacementDeckTitle(state.decks));
+    const nextDecks = [nextDeck, ...state.decks];
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({
+      decks: nextDecks,
+      deck: nextDeck,
+      activeDeckId: nextDeck.id,
+      selectedSlideId: nextDeck.slides[0]?.id ?? ""
+    });
+
+    return nextDeck.id;
+  },
+  deleteDeck: (deckId) => {
+    const state = get();
+    const remaining = state.decks.filter((item) => item.id !== deckId);
+
+    if (remaining.length === 0) {
+      const fallback = createEmptyDeck("ProofDeck Demo");
+      persistLibrary([fallback], fallback.id);
+      set({
+        decks: [fallback],
+        deck: fallback,
+        activeDeckId: fallback.id,
+        selectedSlideId: fallback.slides[0]?.id ?? ""
       });
-      persistDeck(next);
-      return { deck: next };
-    }),
+      return;
+    }
+
+    const nextActiveDeck = remaining.find((item) => item.id === state.activeDeckId) ?? remaining[0];
+    if (!nextActiveDeck) {
+      return;
+    }
+
+    persistLibrary(remaining, nextActiveDeck.id);
+    set({
+      decks: remaining,
+      deck: nextActiveDeck,
+      activeDeckId: nextActiveDeck.id,
+      selectedSlideId: nextActiveDeck.slides[0]?.id ?? ""
+    });
+  },
+  setDeckTitle: (title) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp({
+      ...state.deck,
+      title
+    });
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
   selectSlide: (slideId) => set({ selectedSlideId: slideId }),
-  addSlide: () =>
-    set((state) => {
-      const newSlide: Slide = {
-        id: createId("slide"),
-        title: `Slide ${state.deck.slides.length + 1}`,
-        blocks: [defaultBlock("text")]
-      };
+  addSlide: () => {
+    const state = get();
+    const newSlide: Slide = {
+      id: createId("slide"),
+      title: `Slide ${state.deck.slides.length + 1}`,
+      blocks: [defaultBlock("text")]
+    };
 
-      const next = withUpdatedTimestamp({
-        ...state.deck,
-        slides: [...state.deck.slides, newSlide]
-      });
-      persistDeck(next);
+    const nextDeck = withUpdatedTimestamp({
+      ...state.deck,
+      slides: [...state.deck.slides, newSlide]
+    });
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
 
-      return {
-        deck: next,
-        selectedSlideId: newSlide.id
-      };
-    }),
-  updateSlideTitle: (slideId, title) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          title
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  addBlock: (slideId, type) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: [...slide.blocks, defaultBlock(type)]
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  updateBlockLayout: (slideId, blockId, layout) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: slide.blocks.map((block) =>
-            block.id === blockId
-              ? {
-                  ...block,
-                  layout: {
-                    ...block.layout,
-                    ...layout
-                  }
-                }
-              : block
-          )
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  updateTextBlock: (slideId, blockId, text) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: slide.blocks.map((block) =>
-            block.id === blockId && block.type === "text"
-              ? {
-                  ...block,
-                  text
-                }
-              : block
-          )
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  updateMathBlock: (slideId, blockId, latex) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: slide.blocks.map((block) =>
-            block.id === blockId && block.type === "math"
-              ? {
-                  ...block,
-                  latex
-                }
-              : block
-          )
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  updateGraphSpec: (slideId, blockId, spec) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: slide.blocks.map((block) =>
-            block.id === blockId && block.type === "graph"
-              ? {
-                  ...block,
-                  spec
-                }
-              : block
-          )
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  addGraphBlockFromSpec: (slideId, spec) =>
-    set((state) => {
-      const graphBlock: SlideBlock = {
-        id: createId("graph"),
-        type: "graph",
-        spec: {
-          ...spec,
-          id: spec.id || createId("spec")
-        },
-        layout: {
-          x: 520,
-          y: 110,
-          width: 520,
-          height: 300
-        }
-      };
+    persistLibrary(nextDecks, nextDeck.id);
+    set({
+      deck: nextDeck,
+      decks: nextDecks,
+      selectedSlideId: newSlide.id
+    });
+  },
+  updateSlideTitle: (slideId, title) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        title
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
 
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: [...slide.blocks, graphBlock]
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    }),
-  removeBlock: (slideId, blockId) =>
-    set((state) => {
-      const next = withUpdatedTimestamp(
-        updateSlide(state.deck, slideId, (slide) => ({
-          ...slide,
-          blocks: slide.blocks.filter((block) => block.id !== blockId)
-        }))
-      );
-      persistDeck(next);
-      return { deck: next };
-    })
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  addBlock: (slideId, type) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: [...slide.blocks, defaultBlock(type)]
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  updateBlockLayout: (slideId, blockId, layout) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: slide.blocks.map((block) =>
+          block.id === blockId
+            ? {
+                ...block,
+                layout: {
+                  ...block.layout,
+                  ...layout
+                }
+              }
+            : block
+        )
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  updateTextBlock: (slideId, blockId, text) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: slide.blocks.map((block) =>
+          block.id === blockId && block.type === "text"
+            ? {
+                ...block,
+                text
+              }
+            : block
+        )
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  updateMathBlock: (slideId, blockId, latex) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: slide.blocks.map((block) =>
+          block.id === blockId && block.type === "math"
+            ? {
+                ...block,
+                latex
+              }
+            : block
+        )
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  updateGraphSpec: (slideId, blockId, spec) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: slide.blocks.map((block) =>
+          block.id === blockId && block.type === "graph"
+            ? {
+                ...block,
+                spec
+              }
+            : block
+        )
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  addGraphBlockFromSpec: (slideId, spec) => {
+    const state = get();
+    const graphBlock: SlideBlock = {
+      id: createId("graph"),
+      type: "graph",
+      spec: {
+        ...spec,
+        id: spec.id || createId("spec")
+      },
+      layout: {
+        x: 520,
+        y: 110,
+        width: 520,
+        height: 300
+      }
+    };
+
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: [...slide.blocks, graphBlock]
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  },
+  removeBlock: (slideId, blockId) => {
+    const state = get();
+    const nextDeck = withUpdatedTimestamp(
+      updateSlide(state.deck, slideId, (slide) => ({
+        ...slide,
+        blocks: slide.blocks.filter((block) => block.id !== blockId)
+      }))
+    );
+    const nextDecks = replaceDeckInLibrary(state.decks, nextDeck);
+
+    persistLibrary(nextDecks, nextDeck.id);
+    set({ deck: nextDeck, decks: nextDecks });
+  }
 }));
